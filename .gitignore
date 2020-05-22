@@ -35,11 +35,17 @@ nosetests.xml
 .project
 .pydevproject
 
+# VSCode
+*.code-workspace
+.devcontainer
+.vscode
+
 env
 env3
 __pycache__
 venv
 
 .cache
+.mypy_cache
 docs/_build
 .idea/
