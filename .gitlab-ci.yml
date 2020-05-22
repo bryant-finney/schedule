@@ -33,17 +33,19 @@ mypy:
 tox:
     stage: test
     tags:
-        - t2.micro
+        - python3.6
+        - python3.7
+        - python3.8
     before_script:
         - pip install --user --upgrade pip setuptools tox awscli
     script:
-        - tox run
+        - tox run --parallel auto
         - aws s3 cp --recursive .tox/docs/tmp/html "$COVERAGE_BUCKET_PATH"/
     after_script:
         - >
             if [ -d .tox/docs/tmp/html ]; then
                 mkdir -p build/html;
-                cp .tox/docs/tmp/html  build/html;
+                cp -r .tox/docs/tmp/html/*  build/html/;
             fi
     artifacts:
         paths:
