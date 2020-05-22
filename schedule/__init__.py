@@ -227,11 +227,12 @@ class Job(object):
 
     def __str__(self):
         return (
-            "Job(interval={}, " "unit={}, " "do={}, " "args={}, " "kwargs={})"
+            "Job(interval={}, unit={}, do={}, offset={}, args={}, kwargs={})"
         ).format(
             self.interval,
             self.unit,
             self.job_func.__name__,
+            self.offset,
             self.job_func.args,
             self.job_func.keywords,
         )
@@ -257,10 +258,11 @@ class Job(object):
         call_repr = job_func_name + "(" + ", ".join(args + kwargs) + ")"
 
         if self.at_time is not None:
-            return "Every %s %s at %s do %s %s" % (
+            return "Every %s %s at %s plus %s do %s %s" % (
                 self.interval,
                 self.unit[:-1] if self.interval == 1 else self.unit,
                 self.at_time,
+                self.offset,
                 call_repr,
                 timestats,
             )
@@ -268,13 +270,14 @@ class Job(object):
             fmt = (
                 "Every %(interval)s "
                 + ("to %(latest)s " if self.latest is not None else "")
-                + "%(unit)s do %(call_repr)s %(timestats)s"
+                + "%(unit)s with offset %(offset)s do %(call_repr)s %(timestats)s"
             )
 
             return fmt % dict(
                 interval=self.interval,
                 latest=self.latest,
                 unit=(self.unit[:-1] if self.interval == 1 else self.unit),
+                offset=self.offset,
                 call_repr=call_repr,
                 timestats=timestats,
             )
