@@ -8,6 +8,7 @@
 """
 # stdlib
 import datetime as dt
+import functools
 import logging
 
 # third party
@@ -121,3 +122,14 @@ def test_not_always_after():
 
     # the value of the offset shouldn't change, even though it was only followed once
     assert job.offset == job_offset
+
+
+def test_invalid_units():
+    with pytest.raises(schedule.ScheduleValueError):
+        schedule.every(30).seconds.after(5, "fake-unit").do(mock_func, [5, "fake-unit"])
+
+
+def test_partial_func():
+    test_func = functools.partial(mock_func, ["test", "partial"])
+    job = schedule.every(60).seconds.do(test_func, kwargs={"sample": "kwargs"})
+    assert not hasattr(job.job_func, "__name__")

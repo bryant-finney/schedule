@@ -227,14 +227,16 @@ class Job(object):
 
     def __str__(self):
         return (
-            "Job(interval={}, unit={}, do={}, offset={}, args={}, kwargs={})"
+            "Job(interval={interval}, unit={unit}, do={job}, "
+            + ("offset={offset}, " if self.offset else "")
+            + "args={args}, kwargs={kwargs})"
         ).format(
-            self.interval,
-            self.unit,
-            self.job_func.__name__,
-            self.offset,
-            self.job_func.args,
-            self.job_func.keywords,
+            interval=self.interval,
+            unit=self.unit,
+            job=self.job_func.__name__,
+            offset=self.offset,
+            args=self.job_func.args,
+            kwargs=self.job_func.keywords,
         )
 
     def __repr__(self):
@@ -258,19 +260,26 @@ class Job(object):
         call_repr = job_func_name + "(" + ", ".join(args + kwargs) + ")"
 
         if self.at_time is not None:
-            return "Every %s %s at %s plus %s do %s %s" % (
-                self.interval,
-                self.unit[:-1] if self.interval == 1 else self.unit,
-                self.at_time,
-                self.offset,
-                call_repr,
-                timestats,
+            fmt = (
+                "Every %(interval)s %(unit)s at %(time)s "
+                + ("plus %(offset)s " if self.offset else "")
+                + "do %(call_repr)s %(timestats)s"
+            )
+            return fmt % dict(
+                interval=self.interval,
+                unit=self.unit[:-1] if self.interval == 1 else self.unit,
+                time=self.at_time,
+                offset=self.offset,
+                call_repr=call_repr,
+                timestats=timestats,
             )
         else:
             fmt = (
                 "Every %(interval)s "
                 + ("to %(latest)s " if self.latest is not None else "")
-                + "%(unit)s with offset %(offset)s do %(call_repr)s %(timestats)s"
+                + "%(unit)s "
+                + ("with offset %(offset)s " if self.offset else "")
+                + "do %(call_repr)s %(timestats)s"
             )
 
             return fmt % dict(
@@ -498,6 +507,8 @@ class Job(object):
             # job_funcs already wrapped by functools.partial won't have
             # __name__, __module__ or __doc__ and the update_wrapper()
             # call will fail.
+
+            # NOTE: on py37, update_wrapper does not fail
             pass
         self._schedule_next_run()
         self.scheduler.jobs.append(self)
