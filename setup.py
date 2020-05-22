@@ -8,11 +8,13 @@ $ pip install --upgrade twine wheel
 $ python setup.py sdist bdist_wheel --universal
 $ twine upload dist/*
 """
+# stdlib
 import codecs
 
+# third party
 from setuptools import setup
 
-SCHEDULE_VERSION = "0.6.0"
+SCHEDULE_VERSION = "0.7.0"
 SCHEDULE_DOWNLOAD_URL = "https://github.com/dbader/schedule/tarball/" + SCHEDULE_VERSION
 
 
