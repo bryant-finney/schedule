@@ -41,12 +41,15 @@ try:
     from collections.abc import Hashable
 except ImportError:
     from collections import Hashable
+# stdlib
 import datetime
 import functools
 import logging
 import random
 import re
 import time
+
+TIME_UNITS = ("seconds", "minutes", "hours", "days", "weeks")
 
 logger = logging.getLogger("schedule")
 
@@ -197,6 +200,11 @@ class Job(object):
     method, which also defines its `interval`.
     """
 
+    _always_apply_offset: bool = True
+    _initial_offset: int = 0
+    _offset: int = 0
+    _offset_unit: str = ""
+
     def __init__(self, interval, scheduler=None):
         self.interval = interval  # pause interval * unit between runs
         self.latest = None  # upper limit to the interval
@@ -272,104 +280,120 @@ class Job(object):
             )
 
     @property
-    def second(self):
+    def offset(self) -> datetime.timedelta:
+        """Get the offset to add to the period."""
+        return datetime.timedelta(
+            **{self._offset_unit or self.unit: self._offset or self._initial_offset}
+        )
+
+    @property
+    def offset_once(self) -> bool:
+        """Indicate the offset is applied only to the initial schedule time."""
+        return not self._always_apply_offset
+
+    @property
+    def offset_unit(self) -> str:
+        return self._offset_unit or self.unit
+
+    @property
+    def second(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use seconds instead of second")
         return self.seconds
 
     @property
-    def seconds(self):
+    def seconds(self) -> "Job":
         self.unit = "seconds"
         return self
 
     @property
-    def minute(self):
+    def minute(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use minutes instead of minute")
         return self.minutes
 
     @property
-    def minutes(self):
+    def minutes(self) -> "Job":
         self.unit = "minutes"
         return self
 
     @property
-    def hour(self):
+    def hour(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use hours instead of hour")
         return self.hours
 
     @property
-    def hours(self):
+    def hours(self) -> "Job":
         self.unit = "hours"
         return self
 
     @property
-    def day(self):
+    def day(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use days instead of day")
         return self.days
 
     @property
-    def days(self):
+    def days(self) -> "Job":
         self.unit = "days"
         return self
 
     @property
-    def week(self):
+    def week(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use weeks instead of week")
         return self.weeks
 
     @property
-    def weeks(self):
+    def weeks(self) -> "Job":
         self.unit = "weeks"
         return self
 
     @property
-    def monday(self):
+    def monday(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use mondays instead of monday")
         self.start_day = "monday"
         return self.weeks
 
     @property
-    def tuesday(self):
+    def tuesday(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use tuesdays instead of tuesday")
         self.start_day = "tuesday"
         return self.weeks
 
     @property
-    def wednesday(self):
+    def wednesday(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use wednesdays instead of wednesday")
         self.start_day = "wednesday"
         return self.weeks
 
     @property
-    def thursday(self):
+    def thursday(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use thursdays instead of thursday")
         self.start_day = "thursday"
         return self.weeks
 
     @property
-    def friday(self):
+    def friday(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use fridays instead of friday")
         self.start_day = "friday"
         return self.weeks
 
     @property
-    def saturday(self):
+    def saturday(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use saturdays instead of saturday")
         self.start_day = "saturday"
         return self.weeks
 
     @property
-    def sunday(self):
+    def sunday(self) -> "Job":
         if self.interval != 1:
             raise IntervalError("Use sundays instead of sunday")
         self.start_day = "sunday"
@@ -476,6 +500,35 @@ class Job(object):
         self.scheduler.jobs.append(self)
         return self
 
+    def after(self, offset: int, unit: str, always: bool = True) -> "Job":
+        """Add the provided offset to the scheduled run time.
+
+        :param offset: the number of time units to add when scheduling run times
+        :type offset: int
+
+        :param unit: the unit of time measurement used to generate the `timedelta`
+                     offset
+        :type unit: str
+
+        :param always: if False, only apply the offset to the initial scheduled time;
+                       otherwise, apply it to every scheduled run time
+        :type always: bool
+
+        :raises ScheduleValueError: indicate the provided time unit is invalid
+
+        :return: the job object (`self`) to support chaining
+        :rtype: Job
+        """
+        units = f"{unit}s" if not unit.endswith("s") else unit
+
+        if units not in TIME_UNITS:
+            raise ScheduleValueError("Invalid unit '%s'", unit)
+
+        self._offset = offset
+        self._offset_unit = units
+        self._always_apply_offset = always
+        return self
+
     @property
     def should_run(self):
         """
@@ -499,7 +552,7 @@ class Job(object):
         """
         Compute the instant when this job should run next.
         """
-        if self.unit not in ("seconds", "minutes", "hours", "days", "weeks"):
+        if self.unit not in TIME_UNITS:
             raise ScheduleValueError("Invalid unit")
 
         if self.latest is not None:
@@ -511,6 +564,7 @@ class Job(object):
 
         self.period = datetime.timedelta(**{self.unit: interval})
         self.next_run = datetime.datetime.now() + self.period
+
         if self.start_day is not None:
             if self.unit != "weeks":
                 raise ScheduleValueError("`unit` should be 'weeks'")
@@ -532,9 +586,7 @@ class Job(object):
             self.next_run += datetime.timedelta(days_ahead) - self.period
         if self.at_time is not None:
             if self.unit not in ("days", "hours", "minutes") and self.start_day is None:
-                raise ScheduleValueError(
-                    ("Invalid unit without" " specifying start day")
-                )
+                raise ScheduleValueError("Invalid unit without specifying start day")
             kwargs = {"second": self.at_time.second, "microsecond": 0}
             if self.unit == "days" or self.start_day is not None:
                 kwargs["hour"] = self.at_time.hour
@@ -562,10 +614,17 @@ class Job(object):
                     self.next_run = self.next_run - datetime.timedelta(hours=1)
                 elif self.unit == "minutes" and self.at_time.second > now.second:
                     self.next_run = self.next_run - datetime.timedelta(minutes=1)
+
         if self.start_day is not None and self.at_time is not None:
             # Let's see if we will still make that time we specified today
             if (self.next_run - datetime.datetime.now()).days >= 7:
                 self.next_run -= self.period
+
+        if self._offset:
+            self.next_run += self.offset
+            if self.at_time is None or self.offset_once:
+                self._initial_offset = self._offset
+                self._offset = 0
 
 
 # The following methods are shortcuts for not having to

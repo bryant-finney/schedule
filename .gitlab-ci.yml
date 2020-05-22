@@ -1,0 +1,64 @@
+variables:
+    PIPENV_VENV_IN_PROJECT: "1"
+    COVERAGE_BUCKET_PATH: "s3://sphinx.outdoorlinkinc.com/site-revamp/pliny-deps/schedule"
+
+stages:
+    - quality
+    - test
+    - docs
+    - pages
+    - test-environment
+    - production
+
+before_script:
+    - pip install --user --upgrade -r requirements-dev.txt --editable .
+
+flake8:
+    stage: quality
+    allow_failure: true
+    tags:
+        - t2.micro
+    script:
+        - pip install --user --upgrade flake8 flake8-black flake8-isort
+        - flake8
+mypy:
+    stage: quality
+    tags:
+        - t2.micro
+    before_script:
+        - pip install --user --upgrade mypy
+    script:
+        - pipenv run mypy --ignore-missing-imports -p schedule
+
+tox:
+    stage: test
+    tags:
+        - t2.micro
+    before_script:
+        - pip install --user --upgrade tox aws-cli
+    script:
+        - tox run
+        - aws s3 cp --recursive .tox/docs/tmp/html "$COVERAGE_BUCKET_PATH"/
+    after_script:
+        - >
+            if [ -d .tox/docs/tmp/html ]; then
+                mkdir -p build/html;
+                cp .tox/docs/tmp/html  build/html;
+            fi
+    artifacts:
+        paths:
+            - build
+        expire_in: 30 days
+
+deploy docs:
+    stage: pages
+    dependencies:
+        - tox
+    allow_failure: true
+    tags:
+        - docs
+    only:
+        - master
+    script:
+        - mkdir -p /var/www/html/sphinx/site-revamp/pliny-deps/schedule
+        - cp -r build/html/* /var/www/html/sphinx/site-revamp/pliny-deps/schedule/
