@@ -35,7 +35,7 @@ tox:
     tags:
         - t2.micro
     before_script:
-        - pip install --user --upgrade tox aws-cli
+        - pip install --user --upgrade pip setuptools tox awscli
     script:
         - tox run
         - aws s3 cp --recursive .tox/docs/tmp/html "$COVERAGE_BUCKET_PATH"/
