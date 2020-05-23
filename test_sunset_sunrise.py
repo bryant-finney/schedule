@@ -159,3 +159,25 @@ def test_multiple_jobs_with_offsets():
             scheduler.run_pending()
             assert scheduler.jobs[n_minutes_offset % 5].last_run == t
             assert scheduler.next_run == t + dt.timedelta(minutes=1)
+
+
+def test_offset_after_do():
+    t_0 = dt.datetime(2020, 5, 22, 10, 22)
+    with mock_datetime(t_0.year, t_0.month, t_0.day, t_0.hour, t_0.minute, t_0.second):
+        job = (
+            schedule.every(5)
+            .minutes.do(mock_func, kwargs={"schedule_num": 0})
+            .after(1, "minute")
+        )
+        assert job.next_run == t_0 + dt.timedelta(minutes=6)
+
+
+def test_offset_before_do():
+    t_0 = dt.datetime(2020, 5, 22, 10, 22)
+    with mock_datetime(t_0.year, t_0.month, t_0.day, t_0.hour, t_0.minute, t_0.second):
+        job = (
+            schedule.every(5)
+            .minutes.after(1, "minute")
+            .do(mock_func, kwargs={"schedule_num": 0})
+        )
+        assert job.next_run == t_0 + dt.timedelta(minutes=6)

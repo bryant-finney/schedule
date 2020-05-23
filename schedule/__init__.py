@@ -541,6 +541,8 @@ class Job(object):
         self._offset = offset
         self._offset_unit = units
         self._always_apply_offset = always
+        self._apply_if_offset()
+
         return self
 
     @property
@@ -561,6 +563,13 @@ class Job(object):
         self.last_run = datetime.datetime.now()
         self._schedule_next_run()
         return ret
+
+    def _apply_if_offset(self):
+        if self._offset and self.next_run:
+            self.next_run += self.offset
+            if self.at_time is None or self.offset_once:
+                self._initial_offset = self._offset
+                self._offset = 0
 
     def _schedule_next_run(self):
         """
@@ -634,11 +643,7 @@ class Job(object):
             if (self.next_run - datetime.datetime.now()).days >= 7:
                 self.next_run -= self.period
 
-        if self._offset:
-            self.next_run += self.offset
-            if self.at_time is None or self.offset_once:
-                self._initial_offset = self._offset
-                self._offset = 0
+        self._apply_if_offset()
 
 
 # The following methods are shortcuts for not having to
