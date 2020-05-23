@@ -133,3 +133,29 @@ def test_partial_func():
     test_func = functools.partial(mock_func, ["test", "partial"])
     job = schedule.every(60).seconds.do(test_func, kwargs={"sample": "kwargs"})
     assert not hasattr(job.job_func, "__name__")
+
+
+def test_multiple_jobs_with_offsets():
+    """Test five jobs run every five minutes; each a one-minute offset from the last."""
+    scheduler = schedule.Scheduler()
+
+    t_0 = dt.datetime(2020, 5, 22, 10, 22)
+    with mock_datetime(t_0.year, t_0.month, t_0.day, t_0.hour, t_0.minute, t_0.second):
+        jobs = [scheduler.every(5).minutes.do(mock_func, kwargs={"i_schedule": 0})]
+        for i_schedule in range(1, 5):
+            jobs.append(
+                scheduler.every(5)
+                .minutes.do(mock_func, kwargs={"schedule_num": i_schedule})
+                .after(i_schedule, "minute")
+            )
+        assert scheduler.idle_seconds >= 5 * 60
+        assert scheduler.next_run == t_0 + dt.timedelta(minutes=5)
+
+    for n_minutes_offset in range(0, 20):
+        t = t_0 + dt.timedelta(minutes=5) + dt.timedelta(minutes=n_minutes_offset)
+        with mock_datetime(t.year, t.month, t.day, t.hour, t.minute, t.second):
+            assert scheduler.idle_seconds <= 0
+            assert scheduler.next_run == t
+            scheduler.run_pending()
+            assert scheduler.jobs[n_minutes_offset % 5].last_run == t
+            assert scheduler.next_run == t + dt.timedelta(minutes=1)
