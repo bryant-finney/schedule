@@ -87,7 +87,7 @@ def test_always_after():
     assert job.offset == job_offset
 
 
-def test_not_always_after():
+def test_not_always_after_time():
     """Verify that that the offset is always applied when `always` == True."""
     offset = 2
     units = "hours"
@@ -122,6 +122,37 @@ def test_not_always_after():
 
     # the value of the offset shouldn't change, even though it was only followed once
     assert job.offset == job_offset
+
+
+def test_not_always_after():
+    """Verify that the offset will be applied only once even if no time is provided."""
+    offset = 20
+    units = "minutes"
+    t = dt.datetime(2020, 5, 22, 10, 22)
+    with mock_datetime(t.year, t.month, t.day, t.hour, t.minute, t.second):
+        job = (
+            schedule.every(3)
+            .hours.after(offset, units, always=False)
+            .do(mock_func, [offset, units])
+        )
+        assert job.offset_once
+        initial_offset = job.offset + job.period
+        assert job.next_run == t + initial_offset
+
+    t = t + initial_offset
+    with mock_datetime(t.year, t.month, t.day, t.hour, t.minute, t.second):
+        assert job.last_run is None
+        schedule.run_pending()
+        assert job.last_run is not None
+
+        next_offset = job.period - job.offset
+        assert job.next_run == job.last_run + next_offset
+
+    t = t + next_offset
+    with mock_datetime(t.year, t.month, t.day, t.hour, t.minute, t.second):
+        schedule.run_pending()
+        assert job.last_run == t
+        assert job.next_run == t + job.period
 
 
 def test_invalid_units():
