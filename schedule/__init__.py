@@ -565,11 +565,34 @@ class Job(object):
         return ret
 
     def _apply_if_offset(self):
-        if self._offset and self.next_run:
-            self.next_run += self.offset
-            if self.at_time is None or self.offset_once:
+        """Called from 'after()' and '_schedule_next_run()' to apply offsets."""
+        if not (self._offset and self.next_run):
+            # in order to apply the offset, both 'do()' and 'after()' must have been
+            # called
+            return
+
+        if self.at_time:
+            if not self._initial_offset:
+                offset = self.offset
                 self._initial_offset = self._offset
-                self._offset = 0
+            else:
+                if self.offset_once:
+                    offset = datetime.timedelta(0)
+                    self._offset = 0
+                else:
+                    offset = self.offset
+        else:
+            if not self._initial_offset:
+                offset = self.offset
+                self._initial_offset = self._offset
+            else:
+                if self.offset_once:
+                    offset = -self.offset
+                    self._offset = 0
+                else:
+                    offset = datetime.timedelta(0)
+
+        self.next_run += offset
 
     def _schedule_next_run(self):
         """
